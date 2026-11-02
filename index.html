@@ -108,6 +108,16 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
 .cl .row button.main{background:var(--acc);color:#fff;font-weight:700}
 .cl .st{font-size:13px;margin-top:8px}
 .cl .ok{color:#2E8B57}.cl .ng{color:var(--over)}
+.wt{flex:none;width:84px;font-size:14px;color:var(--sub);line-height:1.3}
+.wt label{display:block}
+.wbox{display:flex;align-items:baseline;gap:3px;margin:4px 0 3px}
+.wbox input{padding:5px 6px;font-size:18px;font-weight:700;text-align:right}
+.wbox span{font-size:12px}
+#wDiff{display:block;font-size:11px}
+#wDiff.ng{color:var(--over)}
+.rest{min-width:0}.rest strong{font-size:clamp(28px,9vw,40px)}
+.vw{font-size:10px;color:var(--sub);font-weight:700}
+@media (max-width:399px){.sum{gap:10px}.ring{width:116px;height:116px}.ring svg{width:116px;height:116px}.mid b{font-size:24px}.wt{width:78px}}
 </style>
 </head>
 <body>
@@ -130,6 +140,11 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
           <circle id="arc" cx="66" cy="66" r="56" fill="none" stroke="var(--acc)" stroke-width="14" stroke-linecap="round" stroke-dasharray="351.86" stroke-dashoffset="351.86"/>
         </svg>
         <div class="mid"><b id="total">0</b><span>kcal</span></div>
+      </div>
+      <div class="wt">
+        <label for="wIn">体重</label>
+        <div class="wbox"><input id="wIn" type="number" inputmode="decimal" step="any" min="10" max="400" placeholder="--.-" autocomplete="off"><span>kg</span></div>
+        <small id="wDiff"></small>
       </div>
       <div class="rest">
         <span>脂質の割合</span>
@@ -162,7 +177,7 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
   <div id="viewHis" hidden>
     <section class="card">
       <div class="calhead"><button class="ic" id="mPrev" aria-label="前の月">‹</button><b id="mTitle"></b><button class="ic" id="mNext" aria-label="次の月">›</button></div>
-      <div class="legend"><b class="vp">タンパク質</b>・<b class="vf">脂質</b>・<b class="vc">糖質</b>（g）</div>
+      <div class="legend"><b class="vp">タンパク質</b>・<b class="vf">脂質</b>・<b class="vc">糖質</b>（g）・<b class="vw">体重</b>（kg）</div>
       <div class="cal" id="cal"></div>
     </section>
     <div id="hisList"></div>
@@ -207,7 +222,7 @@ const norm=s=>s.normalize("NFKC").toLowerCase().replace(/[ァ-ヶ]/g,c=>String.f
 const SYN={"鶏":"にわとり","豚":"ぶた","牛":"うし","米":"こめ","鮭":"さけ","サケ":"さけ","ご飯":"水稲めし","白米":"水稲めし","卵":"鶏卵","玉子":"鶏卵","たまご":"鶏卵","玉ねぎ":"たまねぎ","玉葱":"たまねぎ","人参":"にんじん","芋":"いも","鯖":"さば","鰺":"あじ","烏賊":"いか","蛸":"たこ"};
 const short=n=>n.replace(/＜[^＞]*＞ ?/g,"").replace(/^（[^）]*） ?/,"").trim()||n;
 const DB=RAW.map(a=>({id:a[6],fa:a[7]||null,n:a[0],s:short(a[0]),k:a[1],p:a[2],f:a[3],c:a[4],q:a[5],t:norm(a[0]+" "+(TAGS[a[0]]||""))}));
-let state={goal:2000,days:{},custom:{},pendingDel:[]};
+let state={goal:2000,days:{},custom:{},pendingDel:[],weights:{},pendingWDel:[]};
 try{const s=localStorage.getItem(KEY);if(s)state=Object.assign(state,JSON.parse(s))}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 const $=id=>document.getElementById(id);
@@ -289,6 +304,7 @@ function render(){
   $("arc").style.strokeDashoffset=351.86*(1-Math.min(1,kcal/2000));
   const pm=$("pfcM");pm.replaceChildren();
   [["タンパク質",P,4,"var(--p)"],["脂質",F,9,"var(--f)"],["糖質",C,4,"var(--c)"]].forEach(([l,v,m,col])=>pm.append(meter(l,v+" g ＝ "+Math.round(v*m)+" kcal",v/150,col)));
+  renderWeight();
   const box=$("meals");box.replaceChildren();box.append(groupsEl(items,"log"));
   $("dl").textContent=(today?"今日":cur.toLocaleDateString("ja-JP",{month:"long",day:"numeric"}))+"の記録に追加されます";
   // 分析
@@ -299,6 +315,33 @@ function render(){
   $("faNote").textContent=hasFA()?"棒の右端は各50gです。オメガ9は一価不飽和脂肪酸の値です。脂肪酸データのない食品（手入力など）は含まれません。":"脂肪酸のデータは準備中です。";
   const fl_=$("faList");fl_.replaceChildren(groupsEl(items,"fa"));
 }
+// ---- 体重 ----
+// state.weights = { "YYYY-MM-DD": {kg, sent} }、state.pendingWDel = クラウドから消す日付
+const wOf=d=>{const w=state.weights[d];return w?w.kg:null};
+const fmtKg=v=>{const t=String(Math.round(v*100)/100);return t.includes(".")?t:t+".0"};
+function prevDay(d){const x=new Date(d+"T00:00:00");x.setDate(x.getDate()-1);return iso(x)}
+function renderWeight(msg){
+  const d=iso(cur),w=wOf(d),pw=wOf(prevDay(d)),inp=$("wIn"),df=$("wDiff");
+  if(document.activeElement!==inp)inp.value=w==null?"":String(w);
+  df.className="";
+  if(msg){df.textContent=msg;df.className="ng";return}
+  if(w==null)df.textContent="未入力";
+  else if(pw==null)df.textContent="前日の記録なし";
+  else{const x=Math.round((w-pw)*100)/100;df.textContent="前日比 "+(x>0?"+":x<0?"−":"±")+fmtKg(Math.abs(x))+"kg"}
+}
+function setWeight(){
+  const d=iso(cur),raw=$("wIn").value.trim();
+  if(raw===""){
+    if(state.weights[d]){delete state.weights[d];if(!state.pendingWDel.includes(d))state.pendingWDel.push(d);save();cloudFlush()}
+    renderWeight();return;
+  }
+  const v=Math.round(parseFloat(raw)*100)/100;
+  if(!(v>=10&&v<=400)){$("wIn").value=wOf(d)==null?"":String(wOf(d));renderWeight("10〜400kgで入力");return}
+  if(wOf(d)!==v){state.weights[d]={kg:v,sent:0};state.pendingWDel=state.pendingWDel.filter(x=>x!==d);save();cloudFlush()}
+  $("wIn").value=String(v);renderWeight();
+}
+$("wIn").onchange=setWeight;
+$("wIn").onkeydown=e=>{if(e.key==="Enter")e.target.blur()};
 // ---- 履歴 ----
 let hm=new Date(cur.getFullYear(),cur.getMonth(),1),hsel=iso(cur);
 function renderHis(){
@@ -311,21 +354,23 @@ function renderHis(){
     const key=iso(new Date(hm.getFullYear(),hm.getMonth(),d)),its=state.days[key]||[];
     const cell=el("button",{type:"button",className:"day"+(key===hsel?" sel":"")+(key===tk?" tod":"")},el("span",{className:"dn"},String(d)));
     if(its.length){const s=sums(its);[["p",s.p],["f",s.f],["c",s.c]].forEach(([k,v])=>cell.append(el("span",{className:"v v"+k},String(r0(v)))))}
+    const kw=wOf(key);if(kw!=null)cell.append(el("span",{className:"vw"},fmtKg(kw)));
     cell.onclick=()=>{hsel=key;renderHis()};
     cal.append(cell);
   }
   const hl=$("hisList");hl.replaceChildren();
   const its=state.days[hsel]||[];
-  const head=el("div",{className:"hh"},el("span",{},hsel.replace(/-/g,"/")+"　"+Math.round(sums(its).kcal)+" kcal"));
+  const hw=wOf(hsel);
+  const head=el("div",{className:"hh"},el("span",{},hsel.replace(/-/g,"/")+"　"+Math.round(sums(its).kcal)+" kcal"+(hw==null?"":"・"+fmtKg(hw)+" kg")));
   const go=el("button",{type:"button",textContent:"この日を開く"});
   go.onclick=()=>{cur=new Date(hsel+"T00:00:00");tab("log");render()};
   head.append(go);hl.append(head,groupsEl(its,"his"));
 }
 $("mPrev").onclick=()=>{hm=new Date(hm.getFullYear(),hm.getMonth()-1,1);renderHis()};
 $("mNext").onclick=()=>{hm=new Date(hm.getFullYear(),hm.getMonth()+1,1);renderHis()};
-$("bkDet").ontoggle=()=>{if($("bkDet").open)$("bk").value=JSON.stringify({days:state.days,custom:state.custom})};
+$("bkDet").ontoggle=()=>{if($("bkDet").open)$("bk").value=JSON.stringify({days:state.days,custom:state.custom,weights:state.weights})};
 $("bkCopy").onclick=async()=>{$("bk").select();try{await navigator.clipboard.writeText($("bk").value);$("bkMsg").textContent="コピーしました"}catch(e){$("bkMsg").textContent="選択しました。コピーしてください"}};
-$("bkLoad").onclick=()=>{try{const o=JSON.parse($("bk").value);if(!o.days)throw 0;Object.assign(state.days,o.days);Object.assign(state.custom,o.custom||{});save();render();renderHis();$("bkMsg").textContent="復元しました"}catch(e){$("bkMsg").textContent="読み込めませんでした"}};
+$("bkLoad").onclick=()=>{try{const o=JSON.parse($("bk").value);if(!o.days)throw 0;Object.assign(state.days,o.days);Object.assign(state.custom,o.custom||{});Object.entries(o.weights||{}).forEach(([d,w])=>{const kg=Number(w&&w.kg);if(ymd(d)&&kg>=10&&kg<=400){state.weights[d]={kg,sent:0};state.pendingWDel=state.pendingWDel.filter(x=>x!==d)}});save();render();renderHis();$("bkMsg").textContent="復元しました"}catch(e){$("bkMsg").textContent="読み込めませんでした"}};
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 // ---- 追加タブ ----
 let meal=(()=>{const h=new Date().getHours();return h<10?MEALS[0]:h<11?MEALS[1]:h<14?MEALS[2]:h<17?MEALS[3]:MEALS[4]})();
@@ -444,7 +489,22 @@ async function cloudFlush(){
       if(error)throw error;
       part.forEach(([it])=>{it.sent=1});save();
     }
-    // 3) 自分で登録した食品
+    // 3) 体重：削除 → 未送信をアップロード
+    if(state.pendingWDel.length){
+      const ds=[...state.pendingWDel];
+      const {error}=await sb.from("body_weights").delete().in("day",ds);
+      if(error)throw error;
+      state.pendingWDel=state.pendingWDel.filter(x=>!ds.includes(x));save();
+    }
+    const wp=Object.entries(state.weights).filter(([d,w])=>ymd(d)&&!w.sent).map(([d,w])=>[d,w.kg]);
+    for(let i=0;i<wp.length;i+=200){
+      const part=wp.slice(i,i+200),now=new Date().toISOString();
+      const {error}=await sb.from("body_weights").upsert(part.map(([day,kg])=>({day,kg,updated_at:now})),{onConflict:"user_id,day"});
+      if(error)throw error;
+      // 送信中に書き換えられた値は未送信のまま残す
+      part.forEach(([d,kg])=>{const w=state.weights[d];if(w&&w.kg===kg)w.sent=1});save();
+    }
+    // 4) 自分で登録した食品
     const cf=Object.entries(state.custom).map(([name,v])=>({name,k:v.k,p:v.p,f:v.f,c:v.c}));
     if(cf.length){const {error}=await sb.from("custom_foods").upsert(cf,{onConflict:"user_id,name"});if(error)throw error}
     badge("同期済み");
@@ -468,6 +528,17 @@ async function cloudSync(){
     // 送信できていない端末内の記録は残す
     Object.keys(state.days).forEach(d=>state.days[d].forEach(it=>{if(!it.sent&&!state.pendingDel.includes(it.cid))(days[d]||(days[d]=[])).push(it)}));
     state.days=days;
+    const wall=[];
+    for(let from=0;;from+=1000){
+      const {data,error}=await sb.from("body_weights").select("day,kg").order("day",{ascending:true}).range(from,from+999);
+      if(error)throw error;
+      wall.push(...data);if(data.length<1000)break;
+    }
+    const ws={};
+    wall.forEach(r=>{if(!state.pendingWDel.includes(r.day))ws[r.day]={kg:Number(r.kg),sent:1}});
+    // 送信できていない端末内の体重は残す
+    Object.entries(state.weights).forEach(([d,w])=>{if(!w.sent)ws[d]=w});
+    state.weights=ws;
     const {data:cf,error:e2}=await sb.from("custom_foods").select("name,k,p,f,c");
     if(e2)throw e2;
     cf.forEach(r=>{state.custom[r.name]={k:Number(r.k),p:Number(r.p),f:Number(r.f),c:Number(r.c)}});
