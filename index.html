@@ -462,10 +462,11 @@ async function cloudInit(){
   }catch(e){show("clLogin");badge("エラー");msg(errMsg(e),false)}
 }
 function loggedIn(){show("clOn");$("clWho").textContent="ログイン中："+(sbUser&&sbUser.email||"");badge("ログイン中")}
+// 戻り値：送信がすべて成功したら true、失敗したら false
 async function cloudFlush(){
-  if(!sb||!sbUser)return;
-  if(flushing){again=true;return}
-  flushing=true;
+  if(!sb||!sbUser)return false;
+  if(flushing){again=true;return false}
+  flushing=true;let ok=true;
   try{
     // 1) 削除の反映
     if(state.pendingDel.length){
@@ -508,14 +509,17 @@ async function cloudFlush(){
     const cf=Object.entries(state.custom).map(([name,v])=>({name,k:v.k,p:v.p,f:v.f,c:v.c}));
     if(cf.length){const {error}=await sb.from("custom_foods").upsert(cf,{onConflict:"user_id,name"});if(error)throw error}
     badge("同期済み");
-  }catch(e){badge("未同期あり");msg("クラウドに送れませんでした。次の同期でやり直します。",false)}
+  }catch(e){ok=false;badge("未同期あり");msg("クラウドに送れませんでした。次の同期でやり直します。（"+errMsg(e)+"）",false)}
   flushing=false;
   if(again){again=false;cloudFlush()}
+  return ok;
 }
 async function cloudSync(){
   if(!sb||!sbUser)return;
   msg("同期中…");
-  await cloudFlush();
+  // 別の送信が動いている間は終わるのを待ってから送る（結果を正しく受け取るため）
+  while(flushing)await new Promise(r=>setTimeout(r,100));
+  const sent=await cloudFlush();
   try{
     const all=[];
     for(let from=0;;from+=1000){
@@ -543,7 +547,8 @@ async function cloudSync(){
     if(e2)throw e2;
     cf.forEach(r=>{state.custom[r.name]={k:Number(r.k),p:Number(r.p),f:Number(r.f),c:Number(r.c)}});
     save();render();if(!$("viewHis").hidden)renderHis();
-    badge("同期済み");msg("同期しました（記録 "+all.length+" 件）",true);
+    if(sent){badge("同期済み");msg("同期しました（記録 "+all.length+" 件）",true)}
+    else{badge("未同期あり");msg("クラウドから読み込みましたが、この端末の変更の一部を送れませんでした。端末内には残っているので、次の同期でやり直します。",false)}
   }catch(e){badge("エラー");msg("クラウドから読み込めませんでした。",false)}
 }
 $("clSave").onclick=()=>{
