@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "ask": [
+      "mcp__github__merge_pull_request"
+    ]
+  }
+}
