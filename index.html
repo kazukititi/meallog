@@ -291,7 +291,7 @@ function groupsEl(items,mode){
     card.append(el("div",{className:"grp"+(m.startsWith("間食")?" snack":"")},m,el("span",{},sub+" kcal")));
     list.forEach(({it,idx})=>{
       const name=el("div",{className:"n"});
-      if(mode!=="fa"&&carbHi(it))name.append(el("span",{className:"ck",ariaLabel:"糖質8g以上"},"✓"));
+      if(carbHi(it))name.append(el("span",{className:"ck",ariaLabel:"糖質8g以上"},"✓"));
       name.append(it.name+(it.g?"　"+it.g+"g":""));
       let line;
       if(mode==="fa"){const fa=faOf(it);line=fa?FAS.map((x,i)=>x[1]+" "+(fa[i]==null?"－":r2(fa[i]))).join(" / ")+" g":"脂肪酸データなし"}
@@ -328,6 +328,7 @@ function render(){
   const fm=$("faM");fm.replaceChildren();
   FAS.forEach((x,i)=>fm.append(meter(x[0],(Math.round(Number((tot[i]*10).toFixed(8)))/10).toFixed(1)+" g",tot[i]/50,x[2])));
   $("faNote").textContent=hasFA()?"棒の右端は各50gです。オメガ9は一価不飽和脂肪酸の値です。脂肪酸データのない食品（手入力など）は含まれません。":"脂肪酸のデータは準備中です。";
+  if(items.some(carbHi))$("faNote").textContent+="食品名の先頭の✓は、糖質が8g以上の食品です。";
   const fl_=$("faList");fl_.replaceChildren(groupsEl(items,"fa"));
   if(anaMode==="mi")renderMicro();
 }
