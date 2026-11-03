@@ -14,9 +14,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--bg:#FFFFFF;--card:#fff;--ink:#17262B;--sub:#5F7279;--line:#E2E8E6;--acc:#0E7C86;--acc-soft:#D4ECEE;--over:#C23B6B;--p:#3B6FD4;--f:#E0A030;--c:#4BA06A;
-color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+color-scheme:light;box-sizing:border-box}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.6 "Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif}
+body{margin:0;padding:calc(env(safe-area-inset-top,0px) + 14px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);background:var(--bg);color:var(--ink);font:400 16px/1.6 "Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif}
 main{max-width:480px;margin:0 auto;padding:10px 12px 40px}
 .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .top h1{font-size:18px;margin:0;font-weight:700}
@@ -108,16 +108,16 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
 .cl .row button.main{background:var(--acc);color:#fff;font-weight:700}
 .cl .st{font-size:13px;margin-top:8px}
 .cl .ok{color:#2E8B57}.cl .ng{color:var(--over)}
-.wt{flex:none;width:84px;font-size:14px;color:var(--sub);line-height:1.3}
+.wt{flex:none;width:96px;font-size:14px;color:var(--sub);line-height:1.3;margin-right:8px;padding-right:12px;border-right:1px solid var(--line)}
 .wt label{display:block}
 .wbox{display:flex;align-items:baseline;gap:3px;margin:4px 0 3px}
-.wbox input{padding:5px 6px;font-size:18px;font-weight:700;text-align:right}
+.wbox input{padding:8px 6px;min-height:44px;font-size:19px;font-weight:700;text-align:right}
 .wbox span{font-size:12px}
 #wDiff{display:block;font-size:11px}
 #wDiff.ng{color:var(--over)}
 .rest{min-width:0}.rest strong{font-size:clamp(28px,9vw,40px)}
 .vw{font-size:10px;color:var(--sub);font-weight:700}
-@media (max-width:399px){.sum{gap:10px}.ring{width:116px;height:116px}.ring svg{width:116px;height:116px}.mid b{font-size:24px}.wt{width:78px}}
+@media (max-width:399px){.sum{gap:8px}.ring{width:100px;height:100px}.ring svg{width:100px;height:100px}.mid b{font-size:21px}.wt{width:88px;margin-right:6px;padding-right:10px}}
 </style>
 </head>
 <body>
@@ -142,8 +142,8 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
         <div class="mid"><b id="total">0</b><span>kcal</span></div>
       </div>
       <div class="wt">
-        <label for="wIn">体重</label>
-        <div class="wbox"><input id="wIn" type="number" inputmode="decimal" step="any" min="10" max="400" placeholder="--.-" autocomplete="off"><span>kg</span></div>
+        <label for="wIn">体重（kg）</label>
+        <div class="wbox"><input id="wIn" type="number" inputmode="decimal" step="any" min="10" max="400" placeholder="--.-" autocomplete="off"></div>
         <small id="wDiff"></small>
       </div>
       <div class="rest">
@@ -311,7 +311,7 @@ function render(){
   const tot=[0,0,0,0];
   items.forEach(it=>{const fa=faOf(it);if(fa)fa.forEach((v,i)=>tot[i]+=v||0)});
   const fm=$("faM");fm.replaceChildren();
-  FAS.forEach((x,i)=>fm.append(meter(x[0],r2(tot[i])+" g",tot[i]/50,x[2])));
+  FAS.forEach((x,i)=>fm.append(meter(x[0],(Math.round(Number((tot[i]*10).toFixed(8)))/10).toFixed(1)+" g",tot[i]/50,x[2])));
   $("faNote").textContent=hasFA()?"棒の右端は各50gです。オメガ9は一価不飽和脂肪酸の値です。脂肪酸データのない食品（手入力など）は含まれません。":"脂肪酸のデータは準備中です。";
   const fl_=$("faList");fl_.replaceChildren(groupsEl(items,"fa"));
 }
@@ -353,8 +353,8 @@ function renderHis(){
   for(let d=1;d<=n;d++){
     const key=iso(new Date(hm.getFullYear(),hm.getMonth(),d)),its=state.days[key]||[];
     const cell=el("button",{type:"button",className:"day"+(key===hsel?" sel":"")+(key===tk?" tod":"")},el("span",{className:"dn"},String(d)));
-    if(its.length){const s=sums(its);[["p",s.p],["f",s.f],["c",s.c]].forEach(([k,v])=>cell.append(el("span",{className:"v v"+k},String(r0(v)))))}
-    const kw=wOf(key);if(kw!=null)cell.append(el("span",{className:"vw"},fmtKg(kw)));
+    if(its.length){const s=sums(its);[["p",s.p],["f",s.f],["c",s.c]].forEach(([k,v])=>cell.append(el("span",{className:"v v"+k},r0(v)+"g")))}
+    const kw=wOf(key);if(kw!=null)cell.append(el("span",{className:"vw"},fmtKg(kw)+"kg"));
     cell.onclick=()=>{hsel=key;renderHis()};
     cal.append(cell);
   }
