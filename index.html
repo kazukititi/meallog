@@ -117,6 +117,13 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
 #wDiff.ng{color:var(--over)}
 .rest{min-width:0}.rest strong{font-size:clamp(28px,9vw,40px)}
 .vw{font-size:10px;color:var(--sub);font-weight:700}
+.asw{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--line);padding:3px;border-radius:10px;margin-bottom:8px}
+.asw button{border:0;background:none;padding:6px;border-radius:8px;font-weight:700;font-size:14px;color:var(--sub)}
+.asw button.on{background:var(--card);color:var(--ink)}
+.mh{font-size:15px;font-weight:700;margin:0;display:flex;justify-content:space-between;align-items:baseline}
+.mh small{font-weight:400;font-size:11px;color:var(--sub)}
+.mt .rt{font-size:10px;color:var(--sub);font-weight:400;margin-left:4px}
+.mt span.hi{color:var(--over);font-weight:700}
 @media (max-width:399px){.sum{gap:8px}.ring{width:100px;height:100px}.ring svg{width:100px;height:100px}.mid b{font-size:21px}.wt{width:88px;margin-right:6px;padding-right:10px}}
 </style>
 </head>
@@ -171,8 +178,12 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
   </section>
   
   <div id="viewAna" hidden>
-    <section class="card"><div class="meters" id="faM"></div><div class="note" id="faNote"></div></section>
-    <div id="faList"></div>
+    <div class="asw"><button type="button" id="aFa" class="on">脂肪酸</button><button type="button" id="aMi">微量栄養素</button></div>
+    <div id="anaFa">
+      <section class="card"><div class="meters" id="faM"></div><div class="note" id="faNote"></div></section>
+      <div id="faList"></div>
+    </div>
+    <div id="anaMi" hidden></div>
   </div>
   <div id="viewHis" hidden>
     <section class="card">
@@ -314,7 +325,64 @@ function render(){
   FAS.forEach((x,i)=>fm.append(meter(x[0],(Math.round(Number((tot[i]*10).toFixed(8)))/10).toFixed(1)+" g",tot[i]/50,x[2])));
   $("faNote").textContent=hasFA()?"棒の右端は各50gです。オメガ9は一価不飽和脂肪酸の値です。脂肪酸データのない食品（手入力など）は含まれません。":"脂肪酸のデータは準備中です。";
   const fl_=$("faList");fl_.replaceChildren(groupsEl(items,"fa"));
+  if(anaMode==="mi")renderMicro();
 }
+// ---- 分析：微量栄養素 ----
+// 日本食品標準成分表（八訂）増補2023年 本表（可食部100g当たり）。micro.csv に、アプリの食品と同じ並び順で入っている
+// 基準：日本人の食事摂取基準（2025年版）男性18〜29歳。推奨量 → なければ目安量 → なければ目標量
+// [区分, 名前, 単位, 基準の量, 基準の種類]（並びは micro.csv の列と同じ）
+const MIS=[
+  ["v","ビタミンA","µg",850,"推奨量"],["v","ビタミンD","µg",9.0,"目安量"],["v","ビタミンE","mg",6.5,"目安量"],["v","ビタミンK","µg",150,"目安量"],
+  ["v","ビタミンB1","mg",1.1,"推奨量"],["v","ビタミンB2","mg",1.6,"推奨量"],["v","ナイアシン","mg",15,"推奨量"],["v","ビタミンB6","mg",1.5,"推奨量"],
+  ["v","ビタミンB12","µg",4.0,"目安量"],["v","葉酸","µg",240,"推奨量"],["v","パントテン酸","mg",6,"目安量"],["v","ビオチン","µg",50,"目安量"],["v","ビタミンC","mg",100,"推奨量"],
+  ["m","ナトリウム","mg",7500/2.54,"目標量"],["m","カリウム","mg",2500,"目安量"],["m","カルシウム","mg",800,"推奨量"],["m","マグネシウム","mg",340,"推奨量"],
+  ["m","リン","mg",1000,"目安量"],["m","鉄","mg",7.0,"推奨量"],["m","亜鉛","mg",9.0,"推奨量"],["m","銅","mg",0.9,"推奨量"],["m","マンガン","mg",3.5,"目安量"],
+  ["m","ヨウ素","µg",140,"推奨量"],["m","セレン","µg",30,"推奨量"],["m","クロム","µg",10,"目安量"],["m","モリブデン","µg",30,"推奨量"],
+  ["f","食物繊維総量","g",25,"目標"]
+];
+const MIG=[["v","ビタミン類","#E08A1E"],["m","ミネラル類","#3B8FD4"],["f","食物繊維","#4BA06A"]];
+let anaMode="fa",micSt="idle";
+function loadMicro(){
+  if(micSt==="loading"||micSt==="ok")return;
+  micSt="loading";
+  fetch("micro.csv").then(r=>{if(!r.ok)throw 0;return r.text()}).then(t=>{
+    const L=t.trim().split("\n"),h=L[0].split(",");
+    if(h[0]!=="meallog-micro"||+h[2]!==DB.length||L.length-1!==DB.length||h[3].split("|").length!==MIS.length)throw 0;
+    for(let i=0;i<DB.length;i++)DB[i].mi=L[i+1].split(",").map(x=>x===""?null:parseFloat(x));
+    micSt="ok";
+  }).catch(()=>{micSt="err"}).then(()=>{if(anaMode==="mi")renderMicro()});
+}
+// 表示用の丸め：計算は丸めずに行い、最後に表示するときだけ四捨五入する
+function fmtMi(v,ref){const d=ref<10?2:ref<100?1:0;return (Math.round(Number((v*Math.pow(10,d)).toFixed(8)))/Math.pow(10,d)).toLocaleString("ja-JP",{minimumFractionDigits:d,maximumFractionDigits:d})}
+function renderMicro(){
+  const box=$("anaMi");box.replaceChildren();
+  if(micSt!=="ok"){box.append(el("section",{className:"card"},el("div",{className:"note"},micSt==="err"?"微量栄養素のデータを読み込めませんでした。通信できる場所で、もう一度開いてください。":"読み込み中…")));if(micSt==="idle")loadMicro();return}
+  const items=state.days[iso(cur)]||[];
+  const tot=MIS.map(()=>0),miss=MIS.map(()=>false);let noData=0;
+  items.forEach(it=>{
+    const f=it.id?DBID[it.id]:DBS[it.name];
+    if(!f||!f.mi||!it.g){noData++;return}
+    f.mi.forEach((v,i)=>{if(v==null)miss[i]=true;else tot[i]+=v*it.g/100});
+  });
+  MIG.forEach(([g,title,col])=>{
+    const sec=el("section",{className:"card"},el("h3",{className:"mh"},title,el("small",{},"とった量 / 基準の量")));
+    const ms=el("div",{className:"meters"});
+    MIS.forEach(([gg,name,unit,ref,kind],i)=>{
+      if(gg!==g)return;
+      const lab=el("b",{},name+(miss[i]?" ※":""));lab.append(el("span",{className:"rt"},kind));
+      const isNa=name==="ナトリウム",over=isNa&&tot[i]>=ref;
+      const txt=fmtMi(tot[i],ref)+" / "+(isNa?fmtMi(ref,ref)+" 未満 ":fmtMi(ref,ref)+" ")+unit+(isNa?"（食塩 "+(Math.round(tot[i]*2.54/100)/10).toFixed(1)+" g）":"");
+      const sp=el("span",{className:over?"hi":""},txt);
+      const bar=el("i");bar.style.background=over?"var(--over)":col;bar.style.transform="scaleX("+Math.max(0,Math.min(1,tot[i]/ref))+")";
+      ms.append(el("div",{},el("div",{className:"mt"},lab,sp),el("span",{className:"bar"},bar)));
+    });
+    if(g==="f")["水溶性食物繊維","不溶性食物繊維"].forEach(n=>ms.append(el("div",{className:"mt"},el("b",{},n),el("span",{},"データ準備中"))));
+    sec.append(ms);box.append(sec);
+  });
+  box.append(el("p",{className:"note"},"棒の右端は「日本人の食事摂取基準（2025年版）」男性18〜29歳の値です（推奨量、なければ目安量、なければ目標量）。ナトリウムは目標量（食塩相当量7.5g未満）で、超えると赤くなります。食物繊維総量の右端は25gです。※は、成分表に値のない食品を含みます（その食品は0として計算）。"+(noData?"成分表にない食品（手入力など）"+noData+"件は含まれません。":"")));
+}
+function anaSw(m){anaMode=m;$("aFa").className=m==="fa"?"on":"";$("aMi").className=m==="mi"?"on":"";$("anaFa").hidden=m!=="fa";$("anaMi").hidden=m!=="mi";if(m==="mi")renderMicro()}
+$("aFa").onclick=()=>anaSw("fa");$("aMi").onclick=()=>anaSw("mi");
 // ---- 体重 ----
 // state.weights = { "YYYY-MM-DD": {kg, sent} }、state.pendingWDel = クラウドから消す日付
 const wOf=d=>{const w=state.weights[d];return w?w.kg:null};
