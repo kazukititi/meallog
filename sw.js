@@ -1,5 +1,5 @@
-const CACHE = "meallog-v5";
-const FILES = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png", "icon-180.png"];
+const CACHE = "meallog-v6";
+const FILES = ["./", "index.html", "micro.csv", "manifest.json", "icon-192.png", "icon-512.png", "icon-180.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
   self.skipWaiting();
