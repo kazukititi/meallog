@@ -122,6 +122,7 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
 .asw button.on{background:var(--card);color:var(--ink)}
 .mh{font-size:15px;font-weight:700;margin:0;display:flex;justify-content:space-between;align-items:baseline}
 .mt span.hi{color:var(--over);font-weight:700}
+.ck{color:var(--c);font-weight:700;margin-right:4px}
 @media (max-width:399px){.sum{gap:8px}.ring{width:100px;height:100px}.ring svg{width:100px;height:100px}.mid b{font-size:21px}.wt{width:88px;margin-right:6px;padding-right:10px}}
 </style>
 </head>
@@ -160,7 +161,7 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
     <div class="meters" id="pfcM"></div>
   </section>
   <div id="meals"></div>
-  <p class="note">合計kcalは成分表の値です。円は2000kcalで一周します。メーターは、タンパク質・糖質はg×4、脂質はg×9でkcalを出し、棒の右端は各150gです。糖質は利用可能炭水化物（質量計）で、※は質量計の値がないため差引き法で代用した食品です。</p>
+  <p class="note">合計kcalは成分表の値です。円は2000kcalで一周します。メーターは、タンパク質・糖質はg×4、脂質はg×9でkcalを出し、棒の右端は各150gです。糖質は利用可能炭水化物（質量計）で、※は質量計の値がないため差引き法で代用した食品です。食品名の先頭の✓は、糖質が8g以上の食品です。</p>
   </div>
   <section class="card add" id="viewAdd" hidden>
     <div class="seg" id="seg"></div>
@@ -277,6 +278,9 @@ function faOf(it){
   if(!f||!f.fa||!it.g)return null;
   return f.fa.map(v=>v==null?null:v*it.g/100);
 }
+// 糖質が8g以上（記録した量あたり）の食品に✓を付ける
+const CARB_MARK=8;
+const carbHi=it=>Number(it.c)>=CARB_MARK;
 function groupsEl(items,mode){
   const card=el("section",{className:"card meal"});
   if(!items.length)card.append(el("div",{className:"empty"},mode==="log"?"まだ記録がありません。「追加」から入力できます。":"記録がありません"));
@@ -286,7 +290,9 @@ function groupsEl(items,mode){
     const sub=Math.round(list.reduce((a,x)=>a+x.it.kcal,0));
     card.append(el("div",{className:"grp"+(m.startsWith("間食")?" snack":"")},m,el("span",{},sub+" kcal")));
     list.forEach(({it,idx})=>{
-      const name=el("div",{className:"n"},it.name+(it.g?"　"+it.g+"g":""));
+      const name=el("div",{className:"n"});
+      if(mode!=="fa"&&carbHi(it))name.append(el("span",{className:"ck",ariaLabel:"糖質8g以上"},"✓"));
+      name.append(it.name+(it.g?"　"+it.g+"g":""));
       let line;
       if(mode==="fa"){const fa=faOf(it);line=fa?FAS.map((x,i)=>x[1]+" "+(fa[i]==null?"－":r2(fa[i]))).join(" / ")+" g":"脂肪酸データなし"}
       else line="タンパク質 "+it.p+" / 脂質 "+it.f+" / 糖質 "+it.c+" g"+(it.q===1?" ※":"");
@@ -431,6 +437,7 @@ function renderHis(){
   const go=el("button",{type:"button",textContent:"この日を開く"});
   go.onclick=()=>{cur=new Date(hsel+"T00:00:00");tab("log");render()};
   head.append(go);hl.append(head,groupsEl(its,"his"));
+  if(its.some(carbHi))hl.append(el("p",{className:"note"},"食品名の先頭の✓は、糖質が8g以上の食品です。"));
 }
 $("mPrev").onclick=()=>{hm=new Date(hm.getFullYear(),hm.getMonth()-1,1);renderHis()};
 $("mNext").onclick=()=>{hm=new Date(hm.getFullYear(),hm.getMonth()+1,1);renderHis()};
