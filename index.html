@@ -118,6 +118,18 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
 .rest{min-width:0}.rest strong{font-size:clamp(28px,9vw,40px)}
 .vw{font-size:10px;color:var(--sub);font-weight:700}
 .mn{font-size:11px;color:var(--sub);line-height:1.35;margin-top:2px;overflow-wrap:anywhere}
+.rh{display:flex;justify-content:space-between;align-items:center}
+.rh b{font-size:15px}
+.rh button,.rrow button{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:5px 12px;font-size:13px;font-weight:700}
+#rcpForm{display:grid;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.ri{display:grid;grid-template-columns:1fr 64px 12px 26px;gap:5px;align-items:center;font-size:13px;margin-bottom:6px}
+.ri input{padding:7px 9px}.ri .gu{font-size:13px;color:var(--sub)}
+.ri small{display:block;color:var(--sub);font-size:11px}
+.ri button{background:none;border:0;color:var(--sub);font-size:18px}
+.rbtn{display:flex;gap:8px}.rbtn button{flex:1;border:0;border-radius:10px;padding:9px;font-weight:700;background:var(--acc-soft)}.rbtn button.main{background:var(--acc);color:#fff}
+.rmsg{font-size:13px;color:var(--over);min-height:1em}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.35}
+.rrow .n{flex:1;min-width:0;overflow-wrap:anywhere}.rrow button{white-space:nowrap;flex:none}.rrow small{display:block;color:var(--sub);font-size:11px}
 .asw{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--line);padding:3px;border-radius:10px;margin-bottom:8px}
 .asw button{border:0;background:none;padding:6px;border-radius:8px;font-weight:700;font-size:14px;color:var(--sub)}
 .asw button.on{background:var(--card);color:var(--ink)}
@@ -164,7 +176,8 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
   <div id="meals"></div>
   <p class="note">合計kcalは成分表の値です。円は2000kcalで一周します。メーターは、タンパク質・糖質はg×4、脂質はg×9でkcalを出し、棒の右端は各150gです。糖質は利用可能炭水化物（質量計）で、※は質量計の値がないため差引き法で代用した食品です。食品名の先頭の「！」は、糖質が8g以上の食品です。</p>
   </div>
-  <section class="card add" id="viewAdd" hidden>
+  <div id="viewAdd" hidden>
+  <section class="card add">
     <div class="seg" id="seg"></div>
     <input id="fn" placeholder="食品名（例：卵、納豆、鶏むね）" maxlength="40" autocomplete="off">
     <input id="fg" placeholder="g" type="number" inputmode="decimal" min="0">
@@ -176,6 +189,21 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
     <button id="addBtn" type="button">追加する</button>
     <div class="dl" id="dl"></div>
   </section>
+  <section class="card" id="rcpBox">
+    <div class="rh"><b>自作食材</b><button type="button" id="rcpNew">＋ 作る</button></div>
+    <div id="rcpForm" hidden>
+      <input id="rcpName" placeholder="自作食材の名前（例：わかめスープ）" maxlength="30" autocomplete="off">
+      <div id="rcpItems"></div>
+      <input id="rcpQ" placeholder="材料を検索して追加（例：卵）" maxlength="40" autocomplete="off">
+      <div class="note" style="margin:0">材料の名前（検索した言葉）は、追加したあとで書き換えられます。</div>
+      <div class="sug" id="rcpSug"></div>
+      <div class="note" id="rcpPv"></div>
+      <div class="rmsg" id="rcpMsg"></div>
+      <div class="rbtn"><button type="button" class="main" id="rcpSave">保存する</button><button type="button" id="rcpCancel">やめる</button></div>
+    </div>
+    <div id="rcpList"></div>
+  </section>
+  </div>
   
   <div id="viewAna" hidden>
     <div class="asw"><button type="button" id="aFa" class="on">脂肪酸</button><button type="button" id="aMi">微量栄養素</button></div>
@@ -233,7 +261,7 @@ const norm=s=>s.normalize("NFKC").toLowerCase().replace(/[ァ-ヶ]/g,c=>String.f
 const SYN={"鶏":"にわとり","豚":"ぶた","牛":"うし","米":"こめ","鮭":"さけ","サケ":"さけ","ご飯":"水稲めし","白米":"水稲めし","卵":"鶏卵","玉子":"鶏卵","たまご":"鶏卵","玉ねぎ":"たまねぎ","玉葱":"たまねぎ","人参":"にんじん","芋":"いも","鯖":"さば","鰺":"あじ","烏賊":"いか","蛸":"たこ"};
 const short=n=>n.replace(/＜[^＞]*＞ ?/g,"").replace(/^（[^）]*） ?/,"").trim()||n;
 const DB=RAW.map(a=>({id:a[6],fa:a[7]||null,n:a[0],s:short(a[0]),k:a[1],p:a[2],f:a[3],c:a[4],q:a[5],t:norm(a[0]+" "+(TAGS[a[0]]||""))}));
-let state={goal:2000,days:{},custom:{},pendingDel:[],weights:{},pendingWDel:[]};
+let state={goal:2000,days:{},custom:{},pendingDel:[],weights:{},pendingWDel:[],recipes:{}};
 try{const s=localStorage.getItem(KEY);if(s)state=Object.assign(state,JSON.parse(s))}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 const $=id=>document.getElementById(id);
@@ -274,9 +302,25 @@ function meter(label,text,frac,color){
   return el("div",{},el("div",{className:"mt"},el("b",{},label),el("span",{},text)),el("span",{className:"bar"},bar));
 }
 function sums(items){const s={kcal:0,p:0,f:0,c:0};items.forEach(i=>{s.kcal+=i.kcal;s.p+=i.p;s.f+=i.f;s.c+=i.c});return s}
+// ---- 自作食材（既存の食材の組み合わせ。1人前） ----
+// state.recipes = { 名前: {items:[{id, g, l(表示名)}], t:作った時刻, u:最後に使った時刻} }
+// 記録には、記録した時点の材料（parts）を一緒に保存する（あとで自作食材を変えても過去の記録は変わらない）
+const gTxt=v=>String(Math.round(v*100)/100);
+const partsTxt=items=>items.map(x=>x.l+gTxt(x.g)+"g").join("•");
+const rcpLabel=(name,items)=>"自作　"+name+"（"+partsTxt(items)+"）";
+function partsMacro(items){
+  let k=0,p=0,f=0,c=0,q=0;
+  items.forEach(x=>{const d=DBID[x.id];if(!d)return;k+=d.k*x.g/100;p+=d.p*x.g/100;f+=d.f*x.g/100;c+=d.c*x.g/100;if(d.q===1)q=1});
+  return{kcal:Math.round(k),p:r1(p),f:r1(f),c:r1(c),q};
+}
 // 記録に対応する食品：食品番号があれば成分表、なければ自作の食品、それもなければ名前で成分表から探す
 function foodOf(it){return it.id?DBID[it.id]:(state.custom[it.name]?{...state.custom[it.name],mine:1}:DBS[it.name])}
 function faOf(it){
+  if(it.rcp){
+    const tot=[0,0,0,0],miss=[false,false,false,false];
+    (it.parts||[]).forEach(x=>{const d=DBID[x.id];FAS.forEach((_,i)=>{const v=d&&d.fa?d.fa[i]:null;if(v==null)miss[i]=true;else tot[i]+=v*x.g/100})});
+    const r=tot.map((v,i)=>v);r.miss=miss;return r;
+  }
   const f=foodOf(it);
   if(!f||!f.fa||!it.g)return null;
   return f.fa.map(v=>v==null?null:v*it.g/100);
@@ -295,9 +339,10 @@ function groupsEl(items,mode){
     list.forEach(({it,idx})=>{
       const name=el("div",{className:"n"});
       if(carbHi(it))name.append(el("span",{className:"ck",ariaLabel:"糖質8g以上"},"!"));
-      name.append(it.name+(it.g?"　"+it.g+"g":""));
+      if(it.rcp)name.append("自作　"+it.name);
+      else name.append(it.name+(it.g?"　"+it.g+"g":""));
       let line;
-      if(mode==="fa"){const fa=faOf(it);line=fa?FAS.map((x,i)=>x[1]+" "+(fa[i]==null?"－":r2(fa[i]))).join(" / ")+" g":"脂肪酸データなし"}
+      if(mode==="fa"){const fa=faOf(it);line=fa?FAS.map((x,i)=>x[1]+" "+(fa[i]==null?"－":r2(fa[i])+(fa.miss&&fa.miss[i]?"※":""))).join(" / ")+" g":"脂肪酸データなし"}
       else line="タンパク質 "+it.p+" / 脂質 "+it.f+" / 糖質 "+it.c+" g"+(it.q===1?" ※":"");
       name.append(el("small",{},line));
       const row=el("div",{className:"item"},name);
@@ -368,6 +413,12 @@ function renderMicro(){
   const items=state.days[iso(cur)]||[];
   const tot=MIS.map(()=>0),miss=MIS.map(()=>false),missN=MIS.map(()=>[]);let noData=0;
   items.forEach(it=>{
+    if(it.rcp){
+      const lab="自作　"+it.name;
+      MIS.forEach((m,i)=>{let none=false;(it.parts||[]).forEach(x=>{const d=DBID[x.id];const v=d&&d.mi?d.mi[i]:null;if(v==null)none=true;else tot[i]+=v*x.g/100});
+        if(none){miss[i]=true;if(!missN[i].includes(lab))missN[i].push(lab)}});
+      return;
+    }
     const f=foodOf(it);
     if(!f||!it.g||(!f.mi&&!f.mine)){noData++;return}
     // 自作の食品は微量栄養素の値がないので、すべての項目で「値なし」として扱う
@@ -448,9 +499,9 @@ function renderHis(){
 }
 $("mPrev").onclick=()=>{hm=new Date(hm.getFullYear(),hm.getMonth()-1,1);renderHis()};
 $("mNext").onclick=()=>{hm=new Date(hm.getFullYear(),hm.getMonth()+1,1);renderHis()};
-$("bkDet").ontoggle=()=>{if($("bkDet").open)$("bk").value=JSON.stringify({days:state.days,custom:state.custom,weights:state.weights})};
+$("bkDet").ontoggle=()=>{if($("bkDet").open)$("bk").value=JSON.stringify({days:state.days,custom:state.custom,weights:state.weights,recipes:state.recipes})};
 $("bkCopy").onclick=async()=>{$("bk").select();try{await navigator.clipboard.writeText($("bk").value);$("bkMsg").textContent="コピーしました"}catch(e){$("bkMsg").textContent="選択しました。コピーしてください"}};
-$("bkLoad").onclick=()=>{try{const o=JSON.parse($("bk").value);if(!o.days)throw 0;Object.assign(state.days,o.days);Object.assign(state.custom,o.custom||{});Object.entries(o.weights||{}).forEach(([d,w])=>{const kg=Number(w&&w.kg);if(ymd(d)&&kg>=10&&kg<=400){state.weights[d]={kg,sent:0};state.pendingWDel=state.pendingWDel.filter(x=>x!==d)}});save();render();renderHis();$("bkMsg").textContent="復元しました"}catch(e){$("bkMsg").textContent="読み込めませんでした"}};
+$("bkLoad").onclick=()=>{try{const o=JSON.parse($("bk").value);if(!o.days)throw 0;Object.assign(state.days,o.days);Object.assign(state.custom,o.custom||{});Object.assign(state.recipes,o.recipes||{});Object.entries(o.weights||{}).forEach(([d,w])=>{const kg=Number(w&&w.kg);if(ymd(d)&&kg>=10&&kg<=400){state.weights[d]={kg,sent:0};state.pendingWDel=state.pendingWDel.filter(x=>x!==d)}});save();render();renderHis();$("bkMsg").textContent="復元しました"}catch(e){$("bkMsg").textContent="読み込めませんでした"}};
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 // ---- 追加タブ ----
 let meal=(()=>{const h=new Date().getHours();return h<10?MEALS[0]:h<11?MEALS[1]:h<14?MEALS[2]:h<17?MEALS[3]:MEALS[4]})();
@@ -460,25 +511,48 @@ drawSeg();
 const mi=["kcal","タンパク質 g","脂質 g","糖質 g"].map(l=>el("input",{type:"number",inputMode:"decimal",min:0,placeholder:"100gあたり "+l}));
 mi.forEach(i=>$("mac").append(i));$("mac").style.gridTemplateColumns="repeat(2,1fr)";
 let sel=null;
+function rcpHits(q){
+  const toks=norm(q).split(" ").filter(Boolean);if(!toks.length)return[];
+  return Object.keys(state.recipes).filter(n=>toks.every(t=>norm(n).includes(t))).sort(rcpOrder);
+}
+const rcpOrder=(a,b)=>{const A=state.recipes[a],B=state.recipes[b];if(!!A.u!==!!B.u)return A.u?-1:1;return A.u?B.u-A.u:(B.t||0)-(A.t||0)};
 function upd(){
   const q=$("fn").value,w=fl($("fg").value);
-  if(!sel||(sel.s||sel.n)!==q)sel=exact(q);
+  if(sel&&sel.rcp&&sel.rcp!==q.trim())sel=null;
+  if(!sel&&state.recipes[q.trim()])sel={rcp:q.trim()};
+  if(!sel||(!sel.rcp&&(sel.s||sel.n)!==q))sel=sel&&sel.rcp?sel:exact(q);
+  const rh=sel?[]:rcpHits(q);
   const m=sel?[]:search(q);
   const sg=$("sug");sg.replaceChildren();
+  rh.forEach(n=>{
+    const r=state.recipes[n],t=partsMacro(r.items);
+    const b=el("button",{type:"button"},rcpLabel(n,r.items),el("small",{},t.kcal+" kcal"));
+    b.onclick=()=>{sel={rcp:n};$("fn").value=n;upd()};
+    sg.append(b);
+  });
+  $("fg").hidden=!!(sel&&sel.rcp);
+  if(sel&&sel.rcp){const r=state.recipes[sel.rcp],t=partsMacro(r.items);$("mac").hidden=true;$("pv").textContent=rcpLabel(sel.rcp,r.items)+"　"+t.kcal+" kcal / タンパク質 "+t.p+" / 脂質 "+t.f+" / 糖質 "+t.c+" g";return}
   m.forEach(f=>{
     const b=el("button",{type:"button"},f.s||f.n,el("small",{},f.k+" kcal/100g"));
     b.onclick=()=>{sel=f;$("fn").value=f.s||f.n;$("fg").focus();upd()};
     sg.append(b);
   });
-  $("mac").hidden=!!sel||m.length>0||!q.trim();
+  $("mac").hidden=!!sel||m.length>0||rh.length>0||!q.trim();
   const pv=$("pv");
   if(sel&&w){const c=calc(sel,w);pv.textContent=c.kcal+" kcal / タンパク質 "+c.p+" / 脂質 "+c.f+" / 糖質 "+c.c+" g"+(sel.q===1?"　※糖質は差引き法の値":"")}
   else pv.textContent=sel?"100gあたり "+sel.k+" kcal。g数を入れてください":"";
 }
 $("fn").oninput=upd;$("fg").oninput=upd;
+function recordRecipe(n){
+  const r=state.recipes[n];if(!r)return;
+  const parts=r.items.map(x=>({id:x.id,g:x.g,l:x.l}));
+  day().push({meal,name:n,g:0,id:"",rcp:1,parts,...partsMacro(parts)});
+  r.u=Date.now();save();cloudFlush();
+}
 $("addBtn").onclick=()=>{
   const q=$("fn").value.trim(),w=fl($("fg").value);
   if(!q){$("fn").focus();return}
+  if(sel&&sel.rcp){recordRecipe(sel.rcp);sel=null;$("fn").value="";$("fg").value="";upd();renderRcp();tab("log");render();return}
   let food=sel||exact(q),nm=q;
   if(!food&&search(q).length){$("pv").textContent="下の候補から食品を選んでください";return}
   if(!w){$("fg").focus();return}
@@ -493,6 +567,55 @@ $("addBtn").onclick=()=>{
   sel=null;$("fn").value="";$("fg").value="";mi.forEach(i=>i.value="");upd();
   tab("log");render();
 };
+let rcpItems=[];
+function rcpPreview(){
+  const box=$("rcpItems");box.replaceChildren();
+  rcpItems.forEach((x,i)=>{
+    const d=DBID[x.id],g=el("input",{type:"number",inputMode:"decimal",min:0,step:"any",placeholder:"0",value:x.g||""});
+    g.oninput=()=>{x.g=fl(g.value);rcpTotals()};
+    const nm=el("input",{value:x.l,maxLength:20,ariaLabel:"材料の表示名"});
+    nm.oninput=()=>{x.l=nm.value.trim()};
+    const del=el("button",{type:"button",ariaLabel:"材料を外す",textContent:"×"});del.onclick=()=>{rcpItems.splice(i,1);rcpPreview()};
+    box.append(el("div",{className:"ri"},el("div",{},nm,el("small",{},"成分表："+(d.s||d.n))),g,el("span",{className:"gu"},"g"),del));
+  });
+  rcpTotals();
+}
+function rcpTotals(){
+  const ok=rcpItems.filter(x=>x.g>0);
+  $("rcpPv").textContent=ok.length?"1人前："+partsMacro(ok).kcal+" kcal / タンパク質 "+partsMacro(ok).p+" / 脂質 "+partsMacro(ok).f+" / 糖質 "+partsMacro(ok).c+" g":"材料を検索して追加し、グラム数を入れてください。";
+}
+function rcpSug(){
+  const q=$("rcpQ").value,sg=$("rcpSug");sg.replaceChildren();
+  search(q).filter(f=>!f.mine).forEach(f=>{
+    const b=el("button",{type:"button"},f.s||f.n,el("small",{},f.k+" kcal/100g"));
+    b.onclick=()=>{rcpItems.push({id:f.id,g:0,l:$("rcpQ").value.trim()||f.s||f.n});$("rcpQ").value="";sg.replaceChildren();rcpPreview();const ins=$("rcpItems").querySelectorAll("input");ins[ins.length-1].focus()};
+    sg.append(b);
+  });
+}
+function rcpOpen(o){$("rcpForm").hidden=!o;$("rcpNew").hidden=o;if(o){rcpItems=[];$("rcpName").value="";$("rcpQ").value="";$("rcpMsg").textContent="";rcpPreview();$("rcpName").focus()}}
+function rcpSave(){
+  const n=$("rcpName").value.trim(),msg=$("rcpMsg");
+  if(!n){msg.textContent="名前を入れてください";$("rcpName").focus();return}
+  if(state.recipes[n]){msg.textContent="同じ名前の自作食材がすでにあります";return}
+  const items=rcpItems.filter(x=>x.g>0);
+  if(!items.length||items.length!==rcpItems.length){msg.textContent="材料を1つ以上追加し、すべてにグラム数を入れてください";return}
+  if(items.length>50){msg.textContent="材料は50個までです";return}
+  state.recipes[n]={items:items.map(x=>({id:x.id,g:x.g,l:x.l||DBID[x.id].s||DBID[x.id].n})),t:Date.now()};
+  save();rcpOpen(false);renderRcp();
+}
+function renderRcp(){
+  const box=$("rcpList");box.replaceChildren();
+  const names=Object.keys(state.recipes).sort(rcpOrder);
+  if(!names.length){box.append(el("div",{className:"empty"},"まだありません。「＋ 作る」から、既存の食材を組み合わせて作れます。"));return}
+  names.forEach(n=>{
+    const r=state.recipes[n],t=partsMacro(r.items);
+    const b=el("button",{type:"button",textContent:"追加する"});
+    b.onclick=()=>{recordRecipe(n);renderRcp();tab("log");render()};
+    box.append(el("div",{className:"rrow"},el("div",{className:"n"},rcpLabel(n,r.items),el("small",{},t.kcal+" kcal / タンパク質 "+t.p+" / 脂質 "+t.f+" / 糖質 "+t.c+" g")),b));
+  });
+}
+$("rcpNew").onclick=()=>rcpOpen(true);$("rcpCancel").onclick=()=>rcpOpen(false);$("rcpSave").onclick=rcpSave;$("rcpQ").oninput=rcpSug;
+renderRcp();
 function tab(t){
   const M={log:"Log",add:"Add",ana:"Ana",his:"His"};
   for(const k in M){$("view"+M[k]).hidden=k!==t;$("t"+M[k]).className=k===t?"on":""}
@@ -527,8 +650,8 @@ function errMsg(e){
 function msg(t,ok){const m=$("clMsg");m.textContent=t||"";m.className="st"+(ok===true?" ok":ok===false?" ng":"")}
 function badge(t){$("clBadge").textContent=t?"（"+t+"）":""}
 function show(which){["clCfg","clLogin","clOn"].forEach(id=>$(id).hidden=id!==which)}
-function toRow(it,day){return{id:it.cid,day,meal:it.meal,name:it.name,grams:it.g||0,food_id:it.id||null,q:it.q||0,kcal:it.kcal,p:it.p,f:it.f,c:it.c}}
-function fromRow(r){return{cid:r.id,meal:r.meal,name:r.name,g:Number(r.grams),id:r.food_id||"",q:r.q,kcal:Number(r.kcal),p:Number(r.p),f:Number(r.f),c:Number(r.c)}}
+function toRow(it,day){return{id:it.cid,day,meal:it.meal,name:it.name,grams:it.g||0,food_id:it.id||null,q:it.q||0,kcal:it.kcal,p:it.p,f:it.f,c:it.c,parts:it.rcp&&it.parts?it.parts:null}}
+function fromRow(r){const o={cid:r.id,meal:r.meal,name:r.name,g:Number(r.grams),id:r.food_id||"",q:r.q,kcal:Number(r.kcal),p:Number(r.p),f:Number(r.f),c:Number(r.c)};if(Array.isArray(r.parts)&&r.parts.length){o.rcp=1;o.parts=r.parts.map(x=>({id:String(x.id),g:Number(x.g),l:String(x.l||"")}))}return o}
 async function cloudInit(){
   const cfg=cfgGet();
   if(!cfg){show("clCfg");badge("未設定");return}
@@ -588,6 +711,10 @@ async function cloudFlush(){
     // 4) 自分で登録した食品
     const cf=Object.entries(state.custom).map(([name,v])=>({name,k:v.k,p:v.p,f:v.f,c:v.c}));
     if(cf.length){const {error}=await sb.from("custom_foods").upsert(cf,{onConflict:"user_id,name"});if(error)throw error}
+    // 自作食材（料理）
+    const iso8=t=>t?new Date(t).toISOString():null;
+    const rc=Object.entries(state.recipes).map(([name,r])=>({name,items:r.items,created_at:iso8(r.t)||new Date().toISOString(),used_at:iso8(r.u),updated_at:new Date().toISOString()}));
+    if(rc.length){const {error}=await sb.from("recipes").upsert(rc,{onConflict:"user_id,name"});if(error)throw error}
     badge("同期済み");
   }catch(e){ok=false;badge("未同期あり");msg("クラウドに送れませんでした。次の同期でやり直します。（"+errMsg(e)+"）",false)}
   flushing=false;
@@ -603,7 +730,7 @@ async function cloudSync(){
   try{
     const all=[];
     for(let from=0;;from+=1000){
-      const {data,error}=await sb.from("meal_entries").select("id,day,meal,name,grams,food_id,q,kcal,p,f,c").order("seq",{ascending:true}).range(from,from+999);
+      const {data,error}=await sb.from("meal_entries").select("id,day,meal,name,grams,food_id,q,kcal,p,f,c,parts").order("seq",{ascending:true}).range(from,from+999);
       if(error)throw error;
       all.push(...data);if(data.length<1000)break;
     }
@@ -626,7 +753,11 @@ async function cloudSync(){
     const {data:cf,error:e2}=await sb.from("custom_foods").select("name,k,p,f,c");
     if(e2)throw e2;
     cf.forEach(r=>{state.custom[r.name]={k:Number(r.k),p:Number(r.p),f:Number(r.f),c:Number(r.c)}});
-    save();render();if(!$("viewHis").hidden)renderHis();
+    const {data:rcs,error:e3}=await sb.from("recipes").select("name,items,created_at,used_at");
+    if(e3)throw e3;
+    rcs.forEach(r=>{if(!Array.isArray(r.items))return;const l=state.recipes[r.name],u=r.used_at?Date.parse(r.used_at):0;
+      state.recipes[r.name]={items:r.items.map(x=>({id:String(x.id),g:Number(x.g),l:String(x.l||"")})),t:Date.parse(r.created_at)||Date.now(),...((Math.max(u,l&&l.u||0))?{u:Math.max(u,l&&l.u||0)}:{})}});
+    save();render();renderRcp();if(!$("viewHis").hidden)renderHis();
     if(sent){badge("同期済み");msg("同期しました（記録 "+all.length+" 件）",true)}
     else{badge("未同期あり");msg("クラウドから読み込みましたが、この端末の変更の一部を送れませんでした。端末内には残っているので、次の同期でやり直します。",false)}
   }catch(e){badge("エラー");msg("クラウドから読み込めませんでした。",false)}
