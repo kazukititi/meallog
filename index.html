@@ -132,7 +132,8 @@ textarea{width:100%;font:16px/1.4 monospace;border:1px solid var(--line);border-
 .rbtn{display:flex;gap:8px}.rbtn button{flex:1;border:0;border-radius:10px;padding:9px;font-weight:700;background:var(--acc-soft)}.rbtn button.main{background:var(--acc);color:#fff}
 .rmsg{font-size:13px;color:var(--over);min-height:1em}
 .rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.35}
-.rrow .n{flex:1;min-width:0;overflow-wrap:anywhere}.rrow button{white-space:nowrap;flex:none}.rrow small{display:block;color:var(--sub);font-size:11px}
+.rrow .n{flex:1;min-width:0;overflow-wrap:anywhere}.rrow button{white-space:nowrap;flex:none}
+.rrow button.rdel{background:none;color:var(--sub);font-size:18px;padding:2px 4px;font-weight:400}.rrow small{display:block;color:var(--sub);font-size:11px}
 .asw{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--line);padding:3px;border-radius:10px;margin-bottom:8px}
 .asw button{border:0;background:none;padding:6px;border-radius:8px;font-weight:700;font-size:14px;color:var(--sub)}
 .asw button.on{background:var(--card);color:var(--ink)}
@@ -264,7 +265,7 @@ const norm=s=>s.normalize("NFKC").toLowerCase().replace(/[ァ-ヶ]/g,c=>String.f
 const SYN={"鶏":"にわとり","豚":"ぶた","牛":"うし","米":"こめ","鮭":"さけ","サケ":"さけ","ご飯":"水稲めし","白米":"水稲めし","卵":"鶏卵","玉子":"鶏卵","たまご":"鶏卵","玉ねぎ":"たまねぎ","玉葱":"たまねぎ","人参":"にんじん","芋":"いも","鯖":"さば","鰺":"あじ","烏賊":"いか","蛸":"たこ"};
 const short=n=>n.replace(/＜[^＞]*＞ ?/g,"").replace(/^（[^）]*） ?/,"").trim()||n;
 const DB=RAW.map(a=>({id:a[6],fa:a[7]||null,n:a[0],s:short(a[0]),k:a[1],p:a[2],f:a[3],c:a[4],q:a[5],t:norm(a[0]+" "+(TAGS[a[0]]||""))}));
-let state={goal:2000,days:{},custom:{},pendingDel:[],weights:{},pendingWDel:[],recipes:{}};
+let state={goal:2000,days:{},custom:{},pendingDel:[],weights:{},pendingWDel:[],recipes:{},pendingRDel:[]};
 try{const s=localStorage.getItem(KEY);if(s)state=Object.assign(state,JSON.parse(s))}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 const $=id=>document.getElementById(id);
@@ -604,7 +605,17 @@ function rcpSave(){
   if(!items.length||items.length!==rcpItems.length){msg.textContent="材料を1つ以上追加し、すべてにグラム数を入れてください";return}
   if(items.length>50){msg.textContent="材料は50個までです";return}
   state.recipes[n]={items:items.map(x=>({id:x.id,g:x.g,l:x.l||DBID[x.id].s||DBID[x.id].n})),t:Date.now()};
+  state.pendingRDel=state.pendingRDel.filter(x=>x!==n);
   save();rcpOpen(false);renderRcp();cloudFlush();
+}
+// 自作食材を消す。過去の記録は、記録した時点の材料を持っているので、そのまま残る
+function rcpDelete(n){
+  if(!state.recipes[n])return;
+  if(!confirm("自作食材「"+n+"」を消しますか？\nこれまでの記録はそのまま残ります。"))return;
+  delete state.recipes[n];
+  if(!state.pendingRDel.includes(n))state.pendingRDel.push(n);
+  if(sel&&sel.rcp===n){sel=null;$("fn").value="";upd()}
+  save();renderRcp();cloudFlush();
 }
 function renderRcp(){
   const box=$("rcpList");box.replaceChildren();
@@ -614,7 +625,9 @@ function renderRcp(){
     const r=state.recipes[n],t=partsMacro(r.items);
     const b=el("button",{type:"button",textContent:"追加する"});
     b.onclick=()=>{recordRecipe(n);renderRcp();tab("log");render()};
-    box.append(el("div",{className:"rrow"},el("div",{className:"n"},rcpLabel(n,r.items),el("small",{},t.kcal+" kcal / タンパク質 "+t.p+" / 脂質 "+t.f+" / 糖質 "+t.c+" g")),b));
+    const del=el("button",{type:"button",className:"rdel",ariaLabel:n+"を消す",textContent:"×"});
+    del.onclick=()=>rcpDelete(n);
+    box.append(el("div",{className:"rrow"},el("div",{className:"n"},rcpLabel(n,r.items),el("small",{},t.kcal+" kcal / タンパク質 "+t.p+" / 脂質 "+t.f+" / 糖質 "+t.c+" g")),b,del));
   });
 }
 $("rcpNew").onclick=()=>rcpOpen(true);$("rcpCancel").onclick=()=>rcpOpen(false);$("rcpSave").onclick=rcpSave;$("rcpQ").oninput=rcpSug;
@@ -714,7 +727,13 @@ async function cloudFlush(){
     // 4) 自分で登録した食品
     const cf=Object.entries(state.custom).map(([name,v])=>({name,k:v.k,p:v.p,f:v.f,c:v.c}));
     if(cf.length){const {error}=await sb.from("custom_foods").upsert(cf,{onConflict:"user_id,name"});if(error)throw error}
-    // 自作食材（料理）
+    // 自作食材（料理）：消したもの → 残っているもの
+    if(state.pendingRDel.length){
+      const ns=[...state.pendingRDel];
+      const {error}=await sb.from("recipes").delete().in("name",ns);
+      if(error)throw error;
+      state.pendingRDel=state.pendingRDel.filter(x=>!ns.includes(x)||state.recipes[x]);save();
+    }
     const iso8=t=>t?new Date(t).toISOString():null;
     const rc=Object.entries(state.recipes).map(([name,r])=>({name,items:r.items,created_at:iso8(r.t)||new Date().toISOString(),used_at:iso8(r.u),updated_at:new Date().toISOString()}));
     if(rc.length){const {error}=await sb.from("recipes").upsert(rc,{onConflict:"user_id,name"});if(error)throw error}
@@ -758,7 +777,7 @@ async function cloudSync(){
     cf.forEach(r=>{state.custom[r.name]={k:Number(r.k),p:Number(r.p),f:Number(r.f),c:Number(r.c)}});
     const {data:rcs,error:e3}=await sb.from("recipes").select("name,items,created_at,used_at");
     if(e3)throw e3;
-    rcs.forEach(r=>{if(!Array.isArray(r.items))return;const l=state.recipes[r.name],u=r.used_at?Date.parse(r.used_at):0;
+    rcs.forEach(r=>{if(!Array.isArray(r.items)||state.pendingRDel.includes(r.name))return;const l=state.recipes[r.name],u=r.used_at?Date.parse(r.used_at):0;
       state.recipes[r.name]={items:r.items.map(x=>({id:String(x.id),g:Number(x.g),l:String(x.l||"")})),t:Date.parse(r.created_at)||Date.now(),...((Math.max(u,l&&l.u||0))?{u:Math.max(u,l&&l.u||0)}:{})}});
     save();render();renderRcp();if(!$("viewHis").hidden)renderHis();
     if(sent){badge("同期済み");msg("同期しました（記録 "+all.length+" 件）",true)}
