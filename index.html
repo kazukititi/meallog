@@ -117,6 +117,7 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
 #wDiff.ng{color:var(--over)}
 .rest{min-width:0}.rest strong{font-size:clamp(28px,9vw,40px)}
 .vw{font-size:10px;color:var(--sub);font-weight:700}
+.mn{font-size:11px;color:var(--sub);line-height:1.35;margin-top:2px;overflow-wrap:anywhere}
 .asw{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--line);padding:3px;border-radius:10px;margin-bottom:8px}
 .asw button{border:0;background:none;padding:6px;border-radius:8px;font-weight:700;font-size:14px;color:var(--sub)}
 .asw button.on{background:var(--card);color:var(--ink)}
@@ -273,8 +274,10 @@ function meter(label,text,frac,color){
   return el("div",{},el("div",{className:"mt"},el("b",{},label),el("span",{},text)),el("span",{className:"bar"},bar));
 }
 function sums(items){const s={kcal:0,p:0,f:0,c:0};items.forEach(i=>{s.kcal+=i.kcal;s.p+=i.p;s.f+=i.f;s.c+=i.c});return s}
+// 記録に対応する食品：食品番号があれば成分表、なければ自作の食品、それもなければ名前で成分表から探す
+function foodOf(it){return it.id?DBID[it.id]:(state.custom[it.name]?{...state.custom[it.name],mine:1}:DBS[it.name])}
 function faOf(it){
-  const f=it.id?DBID[it.id]:DBS[it.name];
+  const f=foodOf(it);
   if(!f||!f.fa||!it.g)return null;
   return f.fa.map(v=>v==null?null:v*it.g/100);
 }
@@ -363,11 +366,12 @@ function renderMicro(){
   const box=$("anaMi");box.replaceChildren();
   if(micSt!=="ok"){box.append(el("section",{className:"card"},el("div",{className:"note"},micSt==="err"?"微量栄養素のデータを読み込めませんでした。通信できる場所で、もう一度開いてください。":"読み込み中…")));if(micSt==="idle")loadMicro();return}
   const items=state.days[iso(cur)]||[];
-  const tot=MIS.map(()=>0),miss=MIS.map(()=>false);let noData=0;
+  const tot=MIS.map(()=>0),miss=MIS.map(()=>false),missN=MIS.map(()=>[]);let noData=0;
   items.forEach(it=>{
-    const f=it.id?DBID[it.id]:DBS[it.name];
-    if(!f||!f.mi||!it.g){noData++;return}
-    f.mi.forEach((v,i)=>{if(v==null)miss[i]=true;else tot[i]+=v*it.g/100});
+    const f=foodOf(it);
+    if(!f||!it.g||(!f.mi&&!f.mine)){noData++;return}
+    // 自作の食品は微量栄養素の値がないので、すべての項目で「値なし」として扱う
+    MIS.forEach((m,i)=>{const v=f.mi?f.mi[i]:null;if(v==null){miss[i]=true;if(!missN[i].includes(it.name))missN[i].push(it.name)}else tot[i]+=v*it.g/100});
   });
   MIG.forEach(([g,title,col])=>{
     const sec=el("section",{className:"card"},el("h3",{className:"mh"},title));
@@ -375,16 +379,18 @@ function renderMicro(){
     MIS.forEach(([gg,name,unit,ref,kind],i)=>{
       if(gg!==g)return;
       const lab=el("b",{},name+(miss[i]?" ※":""));
-      if(ref==null){ms.append(el("div",{className:"mt"},lab,el("span",{},fmtMi(tot[i])+" "+unit)));return}
+      // 成分表に値のない食品の名前を、その項目の下に表示する
+      const mn=()=>missN[i].length?el("div",{className:"mn"},"※ "+missN[i].join(" • ")):"";
+      if(ref==null){ms.append(el("div",{},el("div",{className:"mt"},lab,el("span",{},fmtMi(tot[i])+" "+unit)),mn()));return}
       const isNa=name==="ナトリウム",over=isNa&&tot[i]>=ref;
       const txt=fmtMi(tot[i])+" / "+fmtMi(ref)+(isNa?" 未満 ":" ")+unit+(isNa?"（食塩 "+fmtMi(tot[i]*2.54/1000)+" g）":"");
       const sp=el("span",{className:over?"hi":""},txt);
       const bar=el("i");bar.style.background=over?"var(--over)":col;bar.style.transform="scaleX("+Math.max(0,Math.min(1,tot[i]/ref))+")";
-      ms.append(el("div",{},el("div",{className:"mt"},lab,sp),el("span",{className:"bar"},bar)));
+      ms.append(el("div",{},el("div",{className:"mt"},lab,sp),el("span",{className:"bar"},bar),mn()));
     });
     sec.append(ms);box.append(sec);
   });
-  box.append(el("p",{className:"note"},"棒の右端は「日本人の食事摂取基準（2025年版）」男性18〜29歳の値です（優先度は推奨量⇨目安量⇨目標量）。推奨量は基本の摂取目標、目安量は推奨量がない場合の目安の推奨量、目標量は生活習慣病の予防のための量です。ナトリウム、水溶性食物繊維、不溶性食物繊維、食物繊維総量のみ目標量で、ナトリウムは食塩相当量7.5g未満（超えると赤くなります）、食物繊維総量の右端は25gです。水溶性・不溶性食物繊維は数値のみ表示します。※は、成分表に値のない食品を含みます（その食品は0として計算）。"+(noData?"成分表にない食品（手入力など）"+noData+"件は含まれません。":"")));
+  box.append(el("p",{className:"note"},"棒の右端は「日本人の食事摂取基準（2025年版）」男性18〜29歳の値です（優先度は推奨量⇨目安量⇨目標量）。推奨量は基本の摂取目標、目安量は推奨量がない場合の目安の推奨量、目標量は生活習慣病の予防のための量です。ナトリウム、水溶性食物繊維、不溶性食物繊維、食物繊維総量のみ目標量で、ナトリウムは食塩相当量7.5g未満（超えると赤くなります）、食物繊維総量の右端は25gです。水溶性・不溶性食物繊維は数値のみ表示します。※は、成分表に値のない食品を含みます（その食品は0として計算し、項目の下に食品名を表示）。"+(noData?"食品が見つからない記録"+noData+"件は含まれません。":"")));
 }
 function anaSw(m){anaMode=m;$("aFa").className=m==="fa"?"on":"";$("aMi").className=m==="mi"?"on":"";$("anaFa").hidden=m!=="fa";$("anaMi").hidden=m!=="mi";if(m==="mi")renderMicro()}
 $("aFa").onclick=()=>anaSw("fa");$("aMi").onclick=()=>anaSw("mi");
