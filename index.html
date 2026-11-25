@@ -386,7 +386,7 @@ function renderMicro(){
       if(gg!==g)return;
       const lab=el("b",{},name+(miss[i]?" ※":""));
       // 成分表に値のない食品の名前を、その項目の下に表示する
-      const mn=()=>missN[i].length?el("div",{className:"mn"},"※ "+missN[i].join("・")):"";
+      const mn=()=>missN[i].length?el("div",{className:"mn"},"※ "+missN[i].join(" • ")):"";
       if(ref==null){ms.append(el("div",{},el("div",{className:"mt"},lab,el("span",{},fmtMi(tot[i])+" "+unit)),mn()));return}
       const isNa=name==="ナトリウム",over=isNa&&tot[i]>=ref;
       const txt=fmtMi(tot[i])+" / "+fmtMi(ref)+(isNa?" 未満 ":" ")+unit+(isNa?"（食塩 "+fmtMi(tot[i]*2.54/1000)+" g）":"");
