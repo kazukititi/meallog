@@ -16,6 +16,7 @@
 :root{--bg:#FFFFFF;--card:#fff;--ink:#17262B;--sub:#5F7279;--line:#E2E8E6;--acc:#0E7C86;--acc-soft:#D4ECEE;--over:#C23B6B;--p:#3B6FD4;--f:#E0A030;--c:#4BA06A;
 color-scheme:light;box-sizing:border-box}
 *{box-sizing:border-box}
+html{touch-action:manipulation}
 body{margin:0;padding:calc(env(safe-area-inset-top,0px) + 14px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);background:var(--bg);color:var(--ink);font:400 16px/1.6 "Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif}
 main{max-width:480px;margin:0 auto;padding:10px 12px 40px}
 .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
@@ -50,6 +51,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .add{display:grid;grid-template-columns:1fr 84px;gap:8px;margin-top:10px}
 .add .macros{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:9px 11px;width:100%;min-width:0}
+/* iPhone は16px未満の入力欄を押すと画面を拡大するため、入力欄の文字は16px以上にする */
+input,textarea,select{font-size:16px}
 input:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
 .add button{grid-column:1/-1;background:var(--acc);color:#fff;border:0;border-radius:12px;padding:10px;font-weight:700}
 .add{grid-template-columns:1fr 84px}
@@ -99,7 +102,7 @@ input:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px
 .hh{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:14px;margin:2px 2px 6px}
 .hh button{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:4px 10px;font-size:13px}
 details.card summary{cursor:pointer;font-weight:700;font-size:14px}
-textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-radius:10px;padding:8px;margin-top:6px;color:var(--ink);background:var(--bg)}
+textarea{width:100%;font:16px/1.4 monospace;border:1px solid var(--line);border-radius:10px;padding:8px;margin-top:6px;color:var(--ink);background:var(--bg)}
 .bkb{display:flex;gap:8px;margin-top:6px}
 .bkb button{background:var(--acc-soft);border:0;border-radius:10px;padding:7px 12px;font-size:13px}
 .cl input{margin-top:6px}
@@ -601,7 +604,7 @@ function rcpSave(){
   if(!items.length||items.length!==rcpItems.length){msg.textContent="材料を1つ以上追加し、すべてにグラム数を入れてください";return}
   if(items.length>50){msg.textContent="材料は50個までです";return}
   state.recipes[n]={items:items.map(x=>({id:x.id,g:x.g,l:x.l||DBID[x.id].s||DBID[x.id].n})),t:Date.now()};
-  save();rcpOpen(false);renderRcp();
+  save();rcpOpen(false);renderRcp();cloudFlush();
 }
 function renderRcp(){
   const box=$("rcpList");box.replaceChildren();
