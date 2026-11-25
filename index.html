@@ -134,7 +134,7 @@ textarea{width:100%;font:16px/1.4 monospace;border:1px solid var(--line);border-
 .rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.35}
 .rrow .n{flex:1;min-width:0;overflow-wrap:anywhere}.rrow button{white-space:nowrap;flex:none}
 .rrow button.rdel{background:none;color:var(--sub);font-size:18px;padding:2px 4px;font-weight:400}.rrow small{display:block;color:var(--sub);font-size:11px}
-.tri{background:none!important;border:0;color:var(--acc)!important;font-size:12px!important;padding:0 6px 0 0!important;line-height:1;vertical-align:1px;width:auto}
+.tri{background:none!important;border:0;color:var(--ink)!important;font-size:12px!important;padding:0 6px 0 0!important;line-height:1;vertical-align:1px;width:auto}
 .n.tap{cursor:pointer}
 .pl{margin-top:3px;padding:4px 8px;background:var(--bg);border-left:3px solid var(--acc-soft);font-size:12px;line-height:1.5}
 .pl span{color:var(--sub);font-size:11px}
@@ -348,9 +348,9 @@ function groupsEl(items,mode){
     card.append(el("div",{className:"grp"+(m.startsWith("間食")?" snack":"")},m,el("span",{},sub+" kcal")));
     list.forEach(({it,idx})=>{
       const name=el("div",{className:"n"});
-      // 自作食材は、先頭の三角（▶）を押すと材料の一覧を開く・閉じる
+      // 自作食材は、先頭の三角（閉じているとき▼・開いているとき▲）を押すと材料の一覧を開く・閉じる
       let tri=null;
-      if(it.rcp){tri=el("button",{type:"button",className:"tri",ariaLabel:it.name+"の材料を表示",textContent:openParts.has(it)?"▼":"▶"});tri.setAttribute("aria-expanded",openParts.has(it)?"true":"false");name.append(tri)}
+      if(it.rcp){tri=el("button",{type:"button",className:"tri",ariaLabel:it.name+"の材料を表示",textContent:openParts.has(it)?"▲":"▼"});tri.setAttribute("aria-expanded",openParts.has(it)?"true":"false");name.append(tri)}
       if(carbHi(it))name.append(el("span",{className:"ck",ariaLabel:"糖質8g以上"},"!"));
       if(it.rcp)name.append("自作　"+it.name);
       else name.append(it.name+(it.g?"　"+it.g+"g":""));
@@ -362,7 +362,7 @@ function groupsEl(items,mode){
         const pl=el("div",{className:"pl"});pl.hidden=!openParts.has(it);
         (it.parts||[]).forEach(x=>{const d=DBID[x.id];pl.append(el("div",{},"・"+x.l+" "+gTxt(x.g)+"g",el("span",{},d?"（"+(d.s||d.n)+"）":"")))});
         name.append(pl);
-        const tg=()=>{const o=!openParts.has(it);if(o)openParts.add(it);else openParts.delete(it);pl.hidden=!o;tri.textContent=o?"▼":"▶";tri.setAttribute("aria-expanded",o?"true":"false")};
+        const tg=()=>{const o=!openParts.has(it);if(o)openParts.add(it);else openParts.delete(it);pl.hidden=!o;tri.textContent=o?"▲":"▼";tri.setAttribute("aria-expanded",o?"true":"false")};
         tri.onclick=e=>{e.stopPropagation();tg()};
         name.classList.add("tap");name.onclick=tg;
       }
