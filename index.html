@@ -118,6 +118,12 @@ textarea{width:100%;font:12px/1.4 monospace;border:1px solid var(--line);border-
 .rest{min-width:0}.rest strong{font-size:clamp(28px,9vw,40px)}
 .vw{font-size:10px;color:var(--sub);font-weight:700}
 .mn{font-size:11px;color:var(--sub);line-height:1.35;margin-top:2px;overflow-wrap:anywhere}
+.mx{grid-column:1/-1;border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.mx summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--acc)}
+.mxh{font-size:13px;font-weight:700;margin:10px 0 4px}
+.mxg{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 8px}
+.mxg label{font-size:11px;color:var(--sub);line-height:1.3}
+.mxg input{margin-top:2px;padding:7px 9px}
 .asw{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--line);padding:3px;border-radius:10px;margin-bottom:8px}
 .asw button{border:0;background:none;padding:6px;border-radius:8px;font-weight:700;font-size:14px;color:var(--sub)}
 .asw button.on{background:var(--card);color:var(--ink)}
@@ -274,8 +280,10 @@ function meter(label,text,frac,color){
   return el("div",{},el("div",{className:"mt"},el("b",{},label),el("span",{},text)),el("span",{className:"bar"},bar));
 }
 function sums(items){const s={kcal:0,p:0,f:0,c:0};items.forEach(i=>{s.kcal+=i.kcal;s.p+=i.p;s.f+=i.f;s.c+=i.c});return s}
+// 記録に対応する食品：食品番号があれば成分表、なければ自作の食品、それもなければ名前で成分表から探す
+function foodOf(it){return it.id?DBID[it.id]:(state.custom[it.name]?{...state.custom[it.name],mine:1}:DBS[it.name])}
 function faOf(it){
-  const f=it.id?DBID[it.id]:DBS[it.name];
+  const f=foodOf(it);
   if(!f||!f.fa||!it.g)return null;
   return f.fa.map(v=>v==null?null:v*it.g/100);
 }
@@ -366,9 +374,10 @@ function renderMicro(){
   const items=state.days[iso(cur)]||[];
   const tot=MIS.map(()=>0),miss=MIS.map(()=>false),missN=MIS.map(()=>[]);let noData=0;
   items.forEach(it=>{
-    const f=it.id?DBID[it.id]:DBS[it.name];
-    if(!f||!f.mi||!it.g){noData++;return}
-    f.mi.forEach((v,i)=>{if(v==null){miss[i]=true;if(!missN[i].includes(it.name))missN[i].push(it.name)}else tot[i]+=v*it.g/100});
+    const f=foodOf(it);
+    if(!f||!it.g||(!f.mi&&!f.mine)){noData++;return}
+    // 自作の食品で微量栄養素を入れていないものは、すべての項目で「値なし」として扱う
+    MIS.forEach((m,i)=>{const v=f.mi?f.mi[i]:null;if(v==null){miss[i]=true;if(!missN[i].includes(it.name))missN[i].push(it.name)}else tot[i]+=v*it.g/100});
   });
   MIG.forEach(([g,title,col])=>{
     const sec=el("section",{className:"card"},el("h3",{className:"mh"},title));
@@ -377,7 +386,7 @@ function renderMicro(){
       if(gg!==g)return;
       const lab=el("b",{},name+(miss[i]?" ※":""));
       // 成分表に値のない食品の名前を、その項目の下に表示する
-      const mn=()=>missN[i].length?el("div",{className:"mn"},"※ "+missN[i].join("、")):"";
+      const mn=()=>missN[i].length?el("div",{className:"mn"},"※ "+missN[i].join("・")):"";
       if(ref==null){ms.append(el("div",{},el("div",{className:"mt"},lab,el("span",{},fmtMi(tot[i])+" "+unit)),mn()));return}
       const isNa=name==="ナトリウム",over=isNa&&tot[i]>=ref;
       const txt=fmtMi(tot[i])+" / "+fmtMi(ref)+(isNa?" 未満 ":" ")+unit+(isNa?"（食塩 "+fmtMi(tot[i]*2.54/1000)+" g）":"");
@@ -387,7 +396,7 @@ function renderMicro(){
     });
     sec.append(ms);box.append(sec);
   });
-  box.append(el("p",{className:"note"},"棒の右端は「日本人の食事摂取基準（2025年版）」男性18〜29歳の値です（優先度は推奨量⇨目安量⇨目標量）。推奨量は基本の摂取目標、目安量は推奨量がない場合の目安の推奨量、目標量は生活習慣病の予防のための量です。ナトリウム、水溶性食物繊維、不溶性食物繊維、食物繊維総量のみ目標量で、ナトリウムは食塩相当量7.5g未満（超えると赤くなります）、食物繊維総量の右端は25gです。水溶性・不溶性食物繊維は数値のみ表示します。※は、成分表に値のない食品を含みます（その食品は0として計算）。"+(noData?"成分表にない食品（手入力など）"+noData+"件は含まれません。":"")));
+  box.append(el("p",{className:"note"},"棒の右端は「日本人の食事摂取基準（2025年版）」男性18〜29歳の値です（優先度は推奨量⇨目安量⇨目標量）。推奨量は基本の摂取目標、目安量は推奨量がない場合の目安の推奨量、目標量は生活習慣病の予防のための量です。ナトリウム、水溶性食物繊維、不溶性食物繊維、食物繊維総量のみ目標量で、ナトリウムは食塩相当量7.5g未満（超えると赤くなります）、食物繊維総量の右端は25gです。水溶性・不溶性食物繊維は数値のみ表示します。※は、成分表に値のない食品を含みます（その食品は0として計算し、項目の下に食品名を表示）。"+(noData?"食品が見つからない記録"+noData+"件は含まれません。":"")));
 }
 function anaSw(m){anaMode=m;$("aFa").className=m==="fa"?"on":"";$("aMi").className=m==="mi"?"on":"";$("anaFa").hidden=m!=="fa";$("anaMi").hidden=m!=="mi";if(m==="mi")renderMicro()}
 $("aFa").onclick=()=>anaSw("fa");$("aMi").onclick=()=>anaSw("mi");
@@ -456,6 +465,16 @@ function drawSeg(){seg.replaceChildren();MEALS.forEach(m=>{const b=el("button",{
 drawSeg();
 const mi=["kcal","タンパク質 g","脂質 g","糖質 g"].map(l=>el("input",{type:"number",inputMode:"decimal",min:0,placeholder:"100gあたり "+l}));
 mi.forEach(i=>$("mac").append(i));$("mac").style.gridTemplateColumns="repeat(2,1fr)";
+// 任意：微量栄養素（MIS と同じ並び）と脂肪酸（FAS と同じ並び）。空欄は「値なし」
+const numIn=ph=>el("input",{type:"number",inputMode:"decimal",min:0,step:"any",placeholder:ph});
+const xMi=MIS.map(m=>numIn(m[2])),xFa=FAS.map(()=>numIn("g"));
+(()=>{
+  const det=el("details",{className:"mx"},el("summary",{},"微量栄養素・脂肪酸も入力する（任意）"),el("div",{className:"note"},"100gあたりの値です。分からない項目は空欄のままで大丈夫です（分析タブで※と食品名が表示されます）。"));
+  MIG.forEach(([g,title])=>{const box=el("div",{className:"mxg"});MIS.forEach((m,i)=>{if(m[0]===g)box.append(el("label",{},m[1],xMi[i]))});det.append(el("div",{className:"mxh"},title),box)});
+  const fb=el("div",{className:"mxg"});FAS.forEach((x,i)=>fb.append(el("label",{},x[0],xFa[i])));det.append(el("div",{className:"mxh"},"脂肪酸"),fb);
+  $("mac").append(det);
+})();
+const readX=arr=>{const v=arr.map(i=>i.value.trim()===""?null:fl(i.value));return v.some(x=>x!=null)?v:null};
 let sel=null;
 function upd(){
   const q=$("fn").value,w=fl($("fg").value);
@@ -483,11 +502,13 @@ $("addBtn").onclick=()=>{
   else{
     const v=mi.map(i=>fl(i.value));
     if(!v[0]){mi[0].focus();return}
-    food={k:v[0],p:v[1],f:v[2],c:v[3],q:0};state.custom[q]=food;
+    food={k:v[0],p:v[1],f:v[2],c:v[3],q:0};
+    const xm=readX(xMi),xf=readX(xFa);if(xm)food.mi=xm;if(xf)food.fa=xf;
+    state.custom[q]=food;
   }
   day().push({meal,name:nm,g:w,id:food.id||"",q:food.q||0,...calc(food,w)});
   save();cloudFlush();
-  sel=null;$("fn").value="";$("fg").value="";mi.forEach(i=>i.value="");upd();
+  sel=null;$("fn").value="";$("fg").value="";[...mi,...xMi,...xFa].forEach(i=>i.value="");$("mac").querySelector("details").open=false;upd();
   tab("log");render();
 };
 function tab(t){
@@ -583,7 +604,7 @@ async function cloudFlush(){
       part.forEach(([d,kg])=>{const w=state.weights[d];if(w&&w.kg===kg)w.sent=1});save();
     }
     // 4) 自分で登録した食品
-    const cf=Object.entries(state.custom).map(([name,v])=>({name,k:v.k,p:v.p,f:v.f,c:v.c}));
+    const cf=Object.entries(state.custom).map(([name,v])=>({name,k:v.k,p:v.p,f:v.f,c:v.c,mi:v.mi||null,fa:v.fa||null}));
     if(cf.length){const {error}=await sb.from("custom_foods").upsert(cf,{onConflict:"user_id,name"});if(error)throw error}
     badge("同期済み");
   }catch(e){ok=false;badge("未同期あり");msg("クラウドに送れませんでした。次の同期でやり直します。（"+errMsg(e)+"）",false)}
@@ -620,9 +641,10 @@ async function cloudSync(){
     // 送信できていない端末内の体重は残す
     Object.entries(state.weights).forEach(([d,w])=>{if(!w.sent)ws[d]=w});
     state.weights=ws;
-    const {data:cf,error:e2}=await sb.from("custom_foods").select("name,k,p,f,c");
+    const {data:cf,error:e2}=await sb.from("custom_foods").select("name,k,p,f,c,mi,fa");
     if(e2)throw e2;
-    cf.forEach(r=>{state.custom[r.name]={k:Number(r.k),p:Number(r.p),f:Number(r.f),c:Number(r.c)}});
+    const arr=a=>Array.isArray(a)?a.map(x=>x==null?null:Number(x)):null;
+    cf.forEach(r=>{const o={k:Number(r.k),p:Number(r.p),f:Number(r.f),c:Number(r.c)};const m=arr(r.mi),x=arr(r.fa);if(m)o.mi=m;if(x)o.fa=x;state.custom[r.name]=o});
     save();render();if(!$("viewHis").hidden)renderHis();
     if(sent){badge("同期済み");msg("同期しました（記録 "+all.length+" 件）",true)}
     else{badge("未同期あり");msg("クラウドから読み込みましたが、この端末の変更の一部を送れませんでした。端末内には残っているので、次の同期でやり直します。",false)}
